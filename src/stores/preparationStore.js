@@ -30,8 +30,12 @@ export const usePreparationStore = defineStore('preparation', {
   actions: {
     setRecommendations(weather, airQuality = null, listKey = 'default') {
       const recommendations = ['응원 도구']
+      const heatTemperature = Math.max(
+        weather.temp ?? Number.NEGATIVE_INFINITY,
+        weather.feelsLike ?? Number.NEGATIVE_INFINITY,
+      )
 
-      if (weather.temp >= 30) {
+      if (heatTemperature >= 30) {
         recommendations.push('생수')
       }
 
@@ -60,17 +64,17 @@ export const usePreparationStore = defineStore('preparation', {
       this.currentListKey = listKey
 
       const savedItems = loadSavedItems(listKey)
-      const savedCheckState = new Map(
-        savedItems.map((item) => [item.name, item.checked]),
-      )
+      const savedCheckState = new Map(savedItems.map((item) => [item.name, item.checked]))
       const customItems = savedItems.filter((item) => item.isCustom)
 
-      this.items = recommendations.map((name) => ({
-        id: `recommended:${name}`,
-        name,
-        checked: savedCheckState.get(name) ?? false,
-        isCustom: false,
-      })).concat(customItems)
+      this.items = recommendations
+        .map((name) => ({
+          id: `recommended:${name}`,
+          name,
+          checked: savedCheckState.get(name) ?? false,
+          isCustom: false,
+        }))
+        .concat(customItems)
 
       this.persistItems()
     },
@@ -107,9 +111,7 @@ export const usePreparationStore = defineStore('preparation', {
     },
 
     removeCustomItem(itemId) {
-      this.items = this.items.filter(
-        (item) => item.id !== itemId || !item.isCustom,
-      )
+      this.items = this.items.filter((item) => item.id !== itemId || !item.isCustom)
       this.persistItems()
     },
 
@@ -121,10 +123,7 @@ export const usePreparationStore = defineStore('preparation', {
     },
 
     persistItems() {
-      window.localStorage.setItem(
-        getStorageKey(this.currentListKey),
-        JSON.stringify(this.items),
-      )
+      window.localStorage.setItem(getStorageKey(this.currentListKey), JSON.stringify(this.items))
     },
   },
 })

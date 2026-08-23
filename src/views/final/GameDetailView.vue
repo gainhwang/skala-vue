@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import KakaoStadiumMap from '@/components/exercise/KakaoStadiumMap.vue'
 import { findStadium } from '@/data/stadiums'
 import { useGameStore } from '@/stores/gameStore'
@@ -22,6 +22,7 @@ const props = defineProps({
 
 const gameStore = useGameStore()
 const preparationStore = usePreparationStore()
+const router = useRouter()
 
 const currentWeather = ref(null)
 const forecast = ref(null)
@@ -42,9 +43,7 @@ const stadium = computed(() => {
 const preparationProgress = computed(() => {
   if (preparationStore.items.length === 0) return 0
 
-  return Math.round(
-    (preparationStore.completedCount / preparationStore.items.length) * 100,
-  )
+  return Math.round((preparationStore.completedCount / preparationStore.items.length) * 100)
 })
 
 const airQualityStatus = computed(() => {
@@ -55,6 +54,34 @@ const airQualityStatus = computed(() => {
   if (aqi <= 150) return '민감군 주의'
 
   return '나쁨'
+})
+
+const currentWeatherTagType = computed(() => {
+  const weatherMain = currentWeather.value?.weather[0]?.main
+
+  if (weatherMain === 'Clear') return 'success'
+  if (['Rain', 'Drizzle', 'Thunderstorm'].includes(weatherMain)) return 'danger'
+  if (weatherMain === 'Clouds') return 'info'
+
+  return 'warning'
+})
+
+const forecastTagType = computed(() => {
+  const status = forecast.value?.status ?? ''
+
+  if (status.includes('비')) return 'danger'
+  if (status.includes('맑')) return 'success'
+
+  return 'info'
+})
+
+const airQualityTagType = computed(() => {
+  const aqi = airQuality.value?.aqi
+
+  if (aqi <= 50) return 'success'
+  if (aqi <= 100) return 'warning'
+
+  return 'danger'
 })
 
 const viewingAdvice = computed(() => {
@@ -73,10 +100,7 @@ const viewingAdvice = computed(() => {
     return '약 3시간 이내 비가 올 가능성이 있어 우천 대비가 필요합니다.'
   }
 
-  if (
-    currentWeather.value.main.feels_like >= 30 ||
-    forecast.value.feelsLike >= 30
-  ) {
+  if (currentWeather.value.main.feels_like >= 30 || forecast.value.feelsLike >= 30) {
     return '체감 온도가 높아 생수를 준비하고 수분을 자주 섭취하세요.'
   }
 
@@ -93,6 +117,33 @@ const viewingAdvice = computed(() => {
   }
 
   return '야구를 관람하기에 비교적 무난한 날씨입니다.'
+})
+
+const viewingAdviceType = computed(() => {
+  if (!currentWeather.value || !forecast.value || !airQuality.value) return 'info'
+
+  const currentStatus = getWeatherStatus(
+    currentWeather.value.weather[0].main,
+    currentWeather.value.weather[0].description,
+  )
+
+  if (
+    currentStatus === '비' ||
+    forecast.value.status.includes('비') ||
+    forecast.value.rainProbability >= 50 ||
+    currentWeather.value.main.feels_like >= 30 ||
+    forecast.value.feelsLike >= 30
+  ) {
+    return 'warning'
+  }
+
+  if (airQuality.value.aqi > 100) return 'error'
+
+  if (currentWeather.value.wind.speed >= 7 || currentWeather.value.main.temp <= 15) {
+    return 'warning'
+  }
+
+  return 'success'
 })
 
 const kakaoDirectionsUrl = computed(() => {
@@ -112,6 +163,10 @@ const addCustomItem = () => {
 
   customItemName.value = ''
   customItemError.value = ''
+}
+
+const goBackToGames = () => {
+  router.push({ name: 'weather-final' })
 }
 
 const loadGameDetail = async () => {
@@ -137,6 +192,7 @@ const loadGameDetail = async () => {
     preparationStore.setRecommendations(
       {
         temp: weatherResult.main.temp,
+        feelsLike: weatherResult.main.feels_like,
         status: getWeatherStatus(
           weatherResult.weather[0].main,
           weatherResult.weather[0].description,
@@ -147,10 +203,7 @@ const loadGameDetail = async () => {
       `game:${game.value.id}`,
     )
   } catch (error) {
-    errorMessage.value = getRequestErrorMessage(
-      error,
-      '경기 관람 정보를 불러오지 못했습니다.',
-    )
+    errorMessage.value = getRequestErrorMessage(error, '경기 관람 정보를 불러오지 못했습니다.')
   } finally {
     isLoading.value = false
   }
@@ -161,27 +214,24 @@ watch(() => props.gameId, loadGameDetail, { immediate: true })
 
 <template>
   <section v-if="game && stadium" class="detail-page">
-    <div class="detail-heading">
-      <div>
-        <RouterLink class="back-link" :to="{ name: 'weather-final' }">
-          ← 오늘의 경기
-        </RouterLink>
-        <h2>{{ game.homeTeam.name }} vs {{ game.awayTeam.name }}</h2>
-        <p>{{ stadium.name }} · {{ game.startTime }}</p>
-      </div>
+    <el-page-header class="detail-heading" title="오늘의 경기" @back="goBackToGames">
+      <template #content>
+        <div class="match-title">
+          <strong>{{ game.homeTeam.name }} vs {{ game.awayTeam.name }}</strong>
+          <el-tag type="info" effect="plain">{{ game.startTime }}</el-tag>
+        </div>
+      </template>
 
-      <a :href="kakaoDirectionsUrl" target="_blank" rel="noopener noreferrer">
-        <el-button>카카오맵 길찾기</el-button>
-      </a>
-    </div>
+      <template #extra>
+        <a :href="kakaoDirectionsUrl" target="_blank" rel="noopener noreferrer">
+          <el-button type="primary" plain>카카오맵 길찾기</el-button>
+        </a>
+      </template>
 
-    <el-alert
-      v-if="errorMessage"
-      :title="errorMessage"
-      type="error"
-      :closable="false"
-      show-icon
-    />
+      <p class="stadium-name">🏟️ {{ stadium.name }}</p>
+    </el-page-header>
+
+    <el-alert v-if="errorMessage" :title="errorMessage" type="error" :closable="false" show-icon />
 
     <el-card v-if="isLoading" shadow="never">
       <el-skeleton :rows="8" animated />
@@ -190,82 +240,102 @@ watch(() => props.gameId, loadGameDetail, { immediate: true })
     <template v-else-if="currentWeather && forecast && airQuality">
       <el-row :gutter="16" class="information-grid">
         <el-col :xs="24" :md="8" class="information-column">
-          <el-card shadow="never">
-            <template #header><strong>현재 날씨</strong></template>
-            <dl class="weather-list">
-              <div>
-                <dt>날씨</dt>
-                <dd>{{ currentWeather.weather[0].description }}</dd>
+          <el-card class="information-card" shadow="never">
+            <template #header>
+              <div class="card-title">
+                <strong>현재 날씨</strong>
+                <el-tag :type="currentWeatherTagType" effect="plain">
+                  {{ currentWeather.weather[0].description }}
+                </el-tag>
               </div>
-              <div>
-                <dt>기온</dt>
-                <dd>{{ currentWeather.main.temp.toFixed(1) }}℃</dd>
-              </div>
-              <div>
-                <dt>체감 온도</dt>
-                <dd>{{ currentWeather.main.feels_like.toFixed(1) }}℃</dd>
-              </div>
-              <div>
-                <dt>습도 / 풍속</dt>
-                <dd>{{ currentWeather.main.humidity }}% / {{ currentWeather.wind.speed }}m/s</dd>
-              </div>
-            </dl>
+            </template>
+
+            <el-descriptions :column="1" border>
+              <el-descriptions-item label="기온">
+                {{ currentWeather.main.temp.toFixed(1) }}℃
+              </el-descriptions-item>
+              <el-descriptions-item label="체감 온도">
+                <el-tag
+                  :type="currentWeather.main.feels_like >= 30 ? 'danger' : 'info'"
+                  effect="plain"
+                >
+                  {{ currentWeather.main.feels_like.toFixed(1) }}℃
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="습도">
+                {{ currentWeather.main.humidity }}%
+              </el-descriptions-item>
+              <el-descriptions-item label="풍속">
+                {{ currentWeather.wind.speed }}m/s
+              </el-descriptions-item>
+            </el-descriptions>
           </el-card>
         </el-col>
 
         <el-col :xs="24" :md="8" class="information-column">
-          <el-card shadow="never">
-            <template #header><strong>약 3시간 뒤 예보</strong></template>
-            <dl class="weather-list">
-              <div>
-                <dt>예보 시각</dt>
-                <dd>{{ forecast.dateText }}</dd>
+          <el-card class="information-card" shadow="never">
+            <template #header>
+              <div class="card-title">
+                <strong>약 3시간 뒤 예보</strong>
+                <el-tag :type="forecastTagType" effect="plain">
+                  {{ forecast.status }}
+                </el-tag>
               </div>
-              <div>
-                <dt>날씨</dt>
-                <dd>{{ forecast.status }}</dd>
-              </div>
-              <div>
-                <dt>기온 / 체감</dt>
-                <dd>{{ forecast.temp }}℃ / {{ forecast.feelsLike }}℃</dd>
-              </div>
-              <div>
-                <dt>강수 확률</dt>
-                <dd>{{ forecast.rainProbability }}%</dd>
-              </div>
-            </dl>
+            </template>
+
+            <el-descriptions :column="1" border>
+              <el-descriptions-item label="예보 시각">
+                {{ forecast.dateText }}
+              </el-descriptions-item>
+              <el-descriptions-item label="기온"> {{ forecast.temp }}℃ </el-descriptions-item>
+              <el-descriptions-item label="체감 온도">
+                {{ forecast.feelsLike }}℃
+              </el-descriptions-item>
+              <el-descriptions-item label="강수 확률">
+                <el-tag :type="forecast.rainProbability >= 50 ? 'danger' : 'info'" effect="plain">
+                  {{ forecast.rainProbability }}%
+                </el-tag>
+              </el-descriptions-item>
+            </el-descriptions>
           </el-card>
         </el-col>
 
         <el-col :xs="24" :md="8" class="information-column">
-          <el-card shadow="never">
-            <template #header><strong>현재 대기질</strong></template>
-            <dl class="weather-list">
-              <div>
-                <dt>상태</dt>
-                <dd>{{ airQualityStatus }}</dd>
+          <el-card class="information-card" shadow="never">
+            <template #header>
+              <div class="card-title">
+                <strong>현재 대기질</strong>
+                <el-tag :type="airQualityTagType" effect="plain">
+                  {{ airQualityStatus }}
+                </el-tag>
               </div>
-              <div>
-                <dt>미세먼지 PM10</dt>
-                <dd>{{ airQuality.pm10 }}㎍/㎥</dd>
-              </div>
-              <div>
-                <dt>초미세먼지 PM2.5</dt>
-                <dd>{{ airQuality.pm2_5 }}㎍/㎥</dd>
-              </div>
-              <div>
-                <dt>대기질 지수</dt>
-                <dd>{{ airQuality.aqi }}</dd>
-              </div>
-            </dl>
+            </template>
+
+            <el-descriptions :column="1" border>
+              <el-descriptions-item label="미세먼지 PM10">
+                {{ airQuality.pm10 }}㎍/㎥
+              </el-descriptions-item>
+              <el-descriptions-item label="초미세먼지 PM2.5">
+                {{ airQuality.pm2_5 }}㎍/㎥
+              </el-descriptions-item>
+              <el-descriptions-item label="대기질 지수">
+                {{ airQuality.aqi }}
+              </el-descriptions-item>
+            </el-descriptions>
           </el-card>
         </el-col>
       </el-row>
 
-      <div class="viewing-advice">
-        <strong>관람 안내</strong>
-        <span>{{ viewingAdvice }}</span>
-      </div>
+      <el-alert
+        class="viewing-advice"
+        title="관람 안내"
+        :description="viewingAdvice"
+        :type="viewingAdviceType"
+        :closable="false"
+        show-icon
+      />
+
+      <el-divider content-position="left">관람 준비</el-divider>
 
       <el-card class="checklist-card" shadow="never">
         <template #header>
@@ -275,13 +345,14 @@ watch(() => props.gameId, loadGameDetail, { immediate: true })
               <small>추천 준비물을 확인하고 개인 준비물도 추가할 수 있습니다.</small>
             </div>
 
-            <el-button size="small" @click="preparationStore.resetItems">
-              체크 초기화
-            </el-button>
+            <el-button size="small" @click="preparationStore.resetItems"> 체크 초기화 </el-button>
           </div>
         </template>
 
-        <el-progress :percentage="preparationProgress" />
+        <el-progress
+          :percentage="preparationProgress"
+          :status="preparationProgress === 100 ? 'success' : undefined"
+        />
 
         <div class="custom-item-form">
           <el-input
@@ -291,32 +362,29 @@ watch(() => props.gameId, loadGameDetail, { immediate: true })
             @input="customItemError = ''"
             @keyup.enter="addCustomItem"
           />
-          <el-button
-            type="primary"
-            plain
-            :disabled="!customItemName.trim()"
-            @click="addCustomItem"
-          >
+          <el-button type="primary" plain :disabled="!customItemName.trim()" @click="addCustomItem">
             추가
           </el-button>
         </div>
 
-        <p v-if="customItemError" class="custom-item-error">
+        <el-text v-if="customItemError" class="custom-item-error" type="danger" tag="p">
           {{ customItemError }}
-        </p>
+        </el-text>
 
         <div class="checklist-items">
-          <div
-            v-for="item in preparationStore.items"
-            :key="item.id"
-            class="checklist-item"
-          >
-            <el-checkbox
-              :model-value="item.checked"
-              @change="preparationStore.toggleItem(item.id)"
-            >
-              {{ item.name }}
-            </el-checkbox>
+          <div v-for="item in preparationStore.items" :key="item.id" class="checklist-item">
+            <div class="checklist-label">
+              <el-checkbox
+                :model-value="item.checked"
+                @change="preparationStore.toggleItem(item.id)"
+              >
+                {{ item.name }}
+              </el-checkbox>
+
+              <el-tag v-if="item.name === '생수'" type="danger" effect="plain" size="small">
+                더위 대비
+              </el-tag>
+            </div>
 
             <el-button
               v-if="item.isCustom"
@@ -332,7 +400,9 @@ watch(() => props.gameId, loadGameDetail, { immediate: true })
       </el-card>
 
       <el-card class="map-card" shadow="never">
-        <template #header><strong>{{ stadium.name }} 위치</strong></template>
+        <template #header
+          ><strong>{{ stadium.name }} 위치</strong></template
+        >
         <KakaoStadiumMap :stadiums="[stadium]" />
       </el-card>
     </template>
@@ -351,8 +421,9 @@ watch(() => props.gameId, loadGameDetail, { immediate: true })
   background: #fff;
 }
 
-.detail-heading,
-.card-heading {
+.card-heading,
+.card-title,
+.match-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -361,20 +432,21 @@ watch(() => props.gameId, loadGameDetail, { immediate: true })
 
 .detail-heading {
   margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #ebeef5;
 }
 
-.detail-heading h2 {
-  margin: 0.5rem 0 0.25rem;
+.match-title {
+  justify-content: flex-start;
 }
 
-.detail-heading p {
-  margin: 0;
+.match-title strong {
+  font-size: 1.2rem;
+}
+
+.stadium-name {
+  margin: 1rem 0 0;
   color: #6b7785;
-}
-
-.back-link {
-  padding: 0;
-  color: #409eff;
 }
 
 .information-grid,
@@ -384,50 +456,19 @@ watch(() => props.gameId, loadGameDetail, { immediate: true })
 }
 
 .viewing-advice {
-  display: flex;
-  gap: 0.75rem;
-  padding: 0.9rem 1rem;
   margin-top: 0;
-  border: 1px solid #dfe5ec;
-  border-radius: 8px;
-  background: #f7f9fb;
-}
-
-.viewing-advice strong {
-  flex: 0 0 auto;
 }
 
 .information-column {
   margin-bottom: 1rem;
 }
 
-.information-column .el-card {
+.information-card {
   height: 100%;
 }
 
-.weather-list {
-  margin: 0;
-}
-
-.weather-list > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.55rem 0;
-  border-bottom: 1px solid #ebeef5;
-}
-
-.weather-list > div:last-child {
-  border-bottom: 0;
-}
-
-.weather-list dt {
-  color: #6b7785;
-}
-
-.weather-list dd {
-  margin: 0;
-  text-align: right;
+.card-title {
+  flex-wrap: wrap;
 }
 
 .card-heading > div {
@@ -449,7 +490,6 @@ watch(() => props.gameId, loadGameDetail, { immediate: true })
 
 .custom-item-error {
   margin: 0.4rem 0 0;
-  color: #f56c6c;
   font-size: 0.85rem;
 }
 
@@ -467,19 +507,25 @@ watch(() => props.gameId, loadGameDetail, { immediate: true })
   gap: 0.5rem;
 }
 
+.checklist-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 @media (max-width: 640px) {
   .detail-page {
     padding: 1rem;
   }
 
-  .detail-heading {
-    align-items: stretch;
+  .custom-item-form {
     flex-direction: column;
   }
 
-  .viewing-advice,
-  .custom-item-form {
+  .match-title {
+    align-items: flex-start;
     flex-direction: column;
+    gap: 0.35rem;
   }
 }
 </style>

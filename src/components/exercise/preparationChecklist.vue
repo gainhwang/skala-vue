@@ -73,9 +73,9 @@ watch(
   max-width: 600px;
   padding: 1rem;
   margin: 1.5rem auto 0;
-  border: 1px solid #d7dee8;
+  border: 1px solid #c8d9e8;
   border-radius: 10px;
-  background: #fff;
+  background: #eef6ff;
 }
 
 .checklist ul {

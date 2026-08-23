@@ -246,6 +246,7 @@ const fetchAirQuality = async (stadium) => {
     preparationStore.setRecommendations(
       {
         temp: stadium.weather.main.temp,
+        feelsLike: stadium.weather.main.feels_like,
         status: normalizedStatus,
         windSpeed: stadium.weather.wind.speed,
       },

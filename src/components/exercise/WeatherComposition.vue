@@ -5,8 +5,8 @@ const weatherList = ref([
   { id: 'city_01', name: '광주기아챔피언스필드', temp: 35, status: '맑음' },
   { id: 'city_02', name: '대전한화생명볼파크', temp: 32, status: '비' },
   { id: 'city_03', name: '수원KT위즈파크', temp: 33, status: '흐림' },
-  { id: 'city_03', name: '창원NC파크', temp: 34, status: '흐림' },
-  { id: 'city_03', name: '대구삼성라이온즈파크', temp: 36, status: '맑음' },
+  { id: 'city_04', name: '창원NC파크', temp: 34, status: '흐림' },
+  { id: 'city_05', name: '대구삼성라이온즈파크', temp: 36, status: '맑음' },
 ])
 
 const searchQuery = ref('')
@@ -15,6 +15,12 @@ const showDetail = (cityName, status) => {
   window.alert(`${cityName}의 현재 날씨는 [${status}] 상태입니다.`)
 }
 const count = ref(0)
+
+const cheerMessage = computed(() => {
+  if (count.value === 0) return '아직 모인 승리 기운이 없습니다.'
+
+  return `현재 ${count.value}번의 승리 기운이 모였습니다.`
+})
 
 const filteredWeatherList = computed(() => {
   const query = searchQuery.value.trim()
@@ -26,6 +32,10 @@ const filteredWeatherList = computed(() => {
 
 watch(selectedCityInfo, (newInfo) => {
   console.log(`[watch 감지] 상태 바 문구가 업데이트되었습니다 -> "${newInfo}"`)
+})
+
+watch(count, (newCount) => {
+  console.log(`[추가 watch 감지] 승리 기운이 ${newCount}번으로 변경되었습니다.`)
 })
 
 watchEffect(() => {
@@ -85,7 +95,7 @@ watchEffect(() => {
 
     <div class="cheerup">
       <h3>❤️‍🔥 응원하기 ❤️‍🔥</h3>
-      <h4>승리 기운: {{ count }}</h4>
+      <h4>{{ cheerMessage }}</h4>
       <button @click="count++">승리 버튼</button>
     </div>
   </div>

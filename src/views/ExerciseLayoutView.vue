@@ -1,19 +1,32 @@
 <script setup>
-import { RouterLink, RouterView } from 'vue-router'
+import { computed } from 'vue'
+import { RouterLink, RouterView, useRoute } from 'vue-router'
+import UnitToggler from '@/components/exercise/UnitToggler.vue'
+
+const route = useRoute()
+
+const showUnitToggler = computed(() => {
+  return ['exercise-store', 'exercise-store-detail'].includes(route.name)
+})
 </script>
 
 <template>
   <main class="exercise-layout">
     <header class="exercise-header">
       <h1>날씨 과제 모음</h1>
-      <nav class="exercise-tabs" aria-label="날씨 과제 단계">
-        <RouterLink :to="{ name: 'exercise-mockup' }">1. Mockup</RouterLink>
-        <RouterLink :to="{ name: 'exercise-composition' }">2. Composition</RouterLink>
-        <RouterLink :to="{ name: 'exercise-components' }">3. Components</RouterLink>
-        <RouterLink :to="{ name: 'exercise-router-home' }">4. Router</RouterLink>
-        <RouterLink :to="{ name: 'exercise-store' }">5. Store</RouterLink>
-        <RouterLink :to="{ name: 'exercise-axios' }">6. Axios</RouterLink>
-      </nav>
+
+      <div class="exercise-navigation">
+        <nav class="exercise-tabs" aria-label="날씨 과제 단계">
+          <RouterLink :to="{ name: 'exercise-mockup' }">1. Mockup</RouterLink>
+          <RouterLink :to="{ name: 'exercise-composition' }">2. Composition</RouterLink>
+          <RouterLink :to="{ name: 'exercise-components' }">3. Components</RouterLink>
+          <RouterLink :to="{ name: 'exercise-router-home' }">4. Router</RouterLink>
+          <RouterLink :to="{ name: 'exercise-store' }">5. Store</RouterLink>
+          <RouterLink :to="{ name: 'exercise-axios' }">6. Axios</RouterLink>
+        </nav>
+
+        <UnitToggler v-if="showUnitToggler" />
+      </div>
 
       <RouterLink class="final-link" to="/">← 최종본으로 돌아가기</RouterLink>
     </header>
@@ -45,6 +58,14 @@ import { RouterLink, RouterView } from 'vue-router'
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.5rem;
+}
+
+.exercise-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
 .exercise-tabs a {
@@ -87,6 +108,10 @@ import { RouterLink, RouterView } from 'vue-router'
 
   .exercise-content {
     padding: 1rem;
+  }
+
+  .exercise-navigation {
+    flex-direction: column;
   }
 }
 </style>

@@ -5,8 +5,8 @@ const weatherList = ref([
   { id: 'city_01', name: '광주기아챔피언스필드', temp: 35, status: '맑음' },
   { id: 'city_02', name: '대전한화생명볼파크', temp: 32, status: '비' },
   { id: 'city_03', name: '수원KT위즈파크', temp: 33, status: '흐림' },
-  { id: 'city_03', name: '창원NC파크', temp: 34, status: '흐림' },
-  { id: 'city_03', name: '대구삼성라이온즈파크', temp: 36, status: '맑음' },
+  { id: 'city_04', name: '창원NC파크', temp: 34, status: '흐림' },
+  { id: 'city_05', name: '대구삼성라이온즈파크', temp: 36, status: '맑음' },
 ])
 
 const searchQuery = ref('')

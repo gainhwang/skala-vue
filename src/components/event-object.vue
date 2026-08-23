@@ -3,7 +3,7 @@ import { ref } from 'vue'
 const position = ref('')
 const tagName = ref('')
 const getOnlyEvent = (e) => {
-  position.value = '좌표: X=${e.clientX}, Y=${e.clientY}'
+  position.value = `좌표: X=${e.clientX}, Y=${e.clientY}`
 }
 const getWithParam = (name, e) => {
   tagName.value = `대상: ${name} / 클릭된 태그: ${e.target.tagName}`

@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 
 const props = defineProps({
@@ -17,7 +17,14 @@ const weatherList = [
   { id: 'city_05', name: '대구삼성라이온즈파크', temp: 36, status: '맑음' },
 ]
 
-const city = computed(() => weatherList.find((item) => item.id === props.cityId))
+const city = ref(null)
+
+const selectCityFromRoute = () => {
+  city.value = weatherList.find((item) => item.id === props.cityId) ?? null
+}
+
+onMounted(selectCityFromRoute)
+watch(() => props.cityId, selectCityFromRoute)
 </script>
 
 <template>

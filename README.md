@@ -1,6 +1,6 @@
-# 야구장 직관 날씨 가이드
+# KBO 야구장 직관 날씨 & AI 모닝 브리핑
 
-KBO 경기 관람 전에 구장의 현재 날씨, 약 3시간 뒤 예보, 대기질과 준비물을 한 번에 확인하는 Vue 3 프로젝트입니다. 수업 과제를 단계별로 보관하면서, 각 단계에서 학습한 기능을 하나의 최종 서비스로 통합했습니다.
+KBO 경기 관람 전에 오늘의 실제 경기 일정, 구장 날씨, 대기질과 준비물을 한 번에 확인하는 Vue 3 프로젝트입니다. FastAPI와 LangChain을 연결해 전날 경기 결과를 한국어 모닝 브리핑으로 요약하는 AI 기능도 제공합니다. 수업 과제를 단계별로 보관하면서, 각 단계에서 학습한 기능을 하나의 최종 서비스로 통합했습니다.
 
 - GitHub: https://github.com/gainhwang/skala-vue
 - 배포 주소: https://skala-vue-tan.vercel.app/
@@ -9,10 +9,20 @@ KBO 경기 관람 전에 구장의 현재 날씨, 약 3시간 뒤 예보, 대기
 
 ### 오늘의 경기
 
-- 임의로 등록한 5경기와 홈·원정 구단 표시
+- KBO 공식 사이트 데이터로 당일 경기 일정 조회
+- 홈·원정 구단, 경기 시간, 구장, 경기 상태, 선발투수와 점수 표시
+- 경기가 없는 날에는 빈 경기 안내 표시
 - 각 구단의 상징색 표시
 - OpenWeatherMap으로 경기 구장의 현재 날씨 조회
 - 경기 카드를 선택하면 구장별 상세 페이지로 이동
+
+### AI KBO 모닝 브리핑
+
+- 전날 종료된 KBO 경기의 최종 점수와 승리팀 표시
+- 승리투수, 패전투수, 세이브투수와 결승타 기록 표시
+- LangChain과 OpenAI를 이용해 전체 경기 결과를 짧은 제목과 3~5문장의 한국어 브리핑으로 생성
+- 구조화 출력으로 제목과 요약의 응답 형식을 고정
+- 공식 경기 기록에 없는 선수나 상황을 추측하지 않도록 프롬프트에 제한 조건 적용
 
 ### 경기 상세 정보
 
@@ -34,7 +44,7 @@ KBO 경기 관람 전에 구장의 현재 날씨, 약 3시간 뒤 예보, 대기
 ### MY 구단
 
 - 10개 구단 중 선호 구단 선택 및 브라우저 저장
-- 선택한 구단의 당일 임의 경기와 응원 대결 표시
+- 선택한 구단의 실제 당일 경기와 응원 대결 표시
 - 구단 응원가 YouTube 검색
 - KBO 예매 안내와 각 구단 공식 홈페이지 연결
 
@@ -82,6 +92,13 @@ KBO 경기 관람 전에 구장의 현재 날씨, 약 3시간 뒤 예보, 대기
 - 요구사항: ESLint 오류 제거, API 키 환경변수화·Git 제외, Build, Hosting
 - 구현 내용: ESLint·Build 통과, `.env.local` Git 제외, Vercel SPA rewrite 설정
 
+### 9. LangChain AI - 완료
+
+- KBO 공식 경기 데이터를 가져오는 FastAPI 백엔드 구현
+- `ChatPromptTemplate`, `init_chat_model`, `with_structured_output()`과 LCEL 체인 사용
+- 전날 경기 결과를 근거로 한 AI 모닝 브리핑 API와 Vue 화면 구현
+- 실행 결과가 저장된 제출용 Jupyter Notebook 작성
+
 이전 단계별 결과는 `/exercise` 아래에서 확인할 수 있고, 최종 통합 화면은 `/`에서 시작합니다.
 
 ## 기술 스택
@@ -92,6 +109,9 @@ KBO 경기 관람 전에 구장의 현재 날씨, 약 3시간 뒤 예보, 대기
 - Pinia
 - Axios
 - Element Plus
+- Python / FastAPI
+- LangChain / OpenAI API
+- KBO 공식 경기 데이터
 - OpenWeatherMap API
 - Open-Meteo Air Quality API
 - Kakao Maps JavaScript API 및 Places 서비스
@@ -114,11 +134,16 @@ KBO 경기 관람 전에 구장의 현재 날씨, 약 3시간 뒤 예보, 대기
 ## 프로젝트 구조
 
 ```text
+ai-service/
+├── app/main.py            # KBO 데이터 조회와 LangChain 브리핑 API
+└── requirements.txt       # Python 패키지 목록
+notebooks/
+└── KBO_LangChain_Morning_Briefing.ipynb  # 실행 결과가 포함된 제출용 노트북
 src/
-├── components/exercise/   # 단계별 재사용 컴포넌트
-├── data/                  # KBO 구장 좌표와 기본 정보
+├── components/            # AI 브리핑 카드와 단계별 재사용 컴포넌트
+├── data/                  # KBO 구장·구단 정보
 ├── router/                # 최종 화면과 과제 화면 라우팅
-├── services/              # Axios 날씨·대기질 요청 함수
+├── services/              # KBO AI API와 날씨·대기질 요청 함수
 ├── stores/                # 단위, 경기, 준비물 Pinia Store
 └── views/
     ├── exercise/          # 1~6단계 과제 화면
@@ -131,6 +156,7 @@ src/
 
 - Node.js `20.19.0` 이상 또는 `22.12.0` 이상
 - npm
+- Python 3.11 이상
 
 ### 2. 패키지 설치
 
@@ -152,17 +178,52 @@ cp .env.example .env.local
 VITE_OPENWEATHER_API_KEY=발급받은_OpenWeather_API_KEY
 VITE_OPENWEATHER_BASE_URL=https://api.openweathermap.org/data/2.5
 VITE_KAKAO_MAP_KEY=발급받은_카카오_JavaScript_KEY
+VITE_AI_API_BASE_URL=http://localhost:8000
 ```
 
 `.env.local`은 `.gitignore`의 `*.local` 규칙으로 Git에 업로드되지 않습니다.
 
-### 4. 개발 서버 실행
+### 4. AI 서버 설치와 환경변수 설정
+
+```sh
+cd ai-service
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+`ai-service/.env`에 수업에서 발급받은 OpenAI API 키를 입력합니다.
+
+```env
+OPENAI_API_KEY=발급받은_sk-proj_키
+OPENAI_MODEL=gpt-4o-mini
+FRONTEND_ORIGIN=http://localhost:5173
+```
+
+`ai-service/.env`도 Git에 업로드되지 않습니다. API 키는 README, 소스 코드, Notebook에 직접 적지 않습니다.
+
+### 5. 개발 서버 실행
+
+터미널을 두 개 열어 AI 서버와 Vue 개발 서버를 각각 실행합니다.
+
+터미널 1 - AI 서버:
+
+```sh
+cd ai-service
+source .venv/bin/activate
+uvicorn app.main:app --reload --port 8000
+```
+
+터미널 2 - Vue:
 
 ```sh
 npm run dev
 ```
 
-### 5. 코드 검사와 빌드
+브라우저에서 `http://localhost:5173`을 열고, AI API 문서는 `http://localhost:8000/docs`에서 확인합니다.
+
+### 6. 코드 검사와 빌드
 
 ```sh
 npm run lint
@@ -177,15 +238,24 @@ npm run preview
    - `VITE_OPENWEATHER_API_KEY`
    - `VITE_OPENWEATHER_BASE_URL`
    - `VITE_KAKAO_MAP_KEY`
+   - `VITE_AI_API_BASE_URL` (별도로 배포한 FastAPI 서버 주소)
 3. Build Command는 `npm run build`, Output Directory는 `dist`로 설정합니다.
 4. 배포된 도메인을 카카오 디벨로퍼스의 JavaScript SDK 도메인에 추가합니다.
 5. 배포 화면의 새로고침과 동적 경로 접근을 확인합니다. `vercel.json`에 SPA rewrite가 설정되어 있습니다.
 6. 이 README 상단의 배포 주소를 실제 URL로 교체합니다.
 
+Vue와 FastAPI는 별도의 서버입니다. AI 기능까지 배포하려면 FastAPI 서버를 배포한 뒤 프론트엔드의 `VITE_AI_API_BASE_URL`을 해당 주소로 설정해야 합니다. 로컬 시연에서는 위의 두 터미널 실행 방법을 사용하면 됩니다.
+
+## Notebook 제출
+
+제출 파일은 [`notebooks/KBO_LangChain_Morning_Briefing.ipynb`](notebooks/KBO_LangChain_Morning_Briefing.ipynb)입니다. 재현 가능한 경기 날짜의 KBO 데이터 조회 결과와 LangChain AI 응답이 셀 출력으로 저장되어 있습니다. OpenAI API 키는 저장되어 있지 않으며, 다시 실행할 때 환경변수 또는 숨김 입력으로 받습니다.
+
 ## 데이터 및 기능 범위
 
 - 날씨와 대기질은 외부 API의 실제 데이터를 사용합니다.
-- 오늘의 경기 일정은 API가 아닌 과제용 Mock Data입니다.
+- 오늘의 경기와 전날 경기 결과는 KBO 공식 사이트의 경기 데이터를 사용합니다.
+- KBO 웹사이트 내부 API는 별도의 공개 개발자 API가 아니므로 응답 형식이나 주소가 바뀌면 연동 코드 수정이 필요할 수 있습니다.
+- AI는 수집한 경기 기록을 요약하며, 실시간 중계나 경기 결과 자체를 생성하지 않습니다.
 - 응원 횟수는 현재 페이지의 Pinia 상태이므로 새로고침하면 초기화됩니다.
 - 선호 구단과 개인 준비물은 브라우저 `localStorage`에 저장됩니다.
 - 주변 장소는 카카오맵의 거리순 검색 결과이며 별점 기반 추천이 아닙니다.

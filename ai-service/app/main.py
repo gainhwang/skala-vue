@@ -67,6 +67,8 @@ class GameResult(BaseModel):
     away_team: str
     home_score: int
     away_score: int
+    winner: str | None = None
+    loser: str | None = None
     winning_pitcher: str | None = None
     losing_pitcher: str | None = None
     save_pitcher: str | None = None
@@ -117,6 +119,8 @@ class MorningBriefingResponse(BaseModel):
 SYSTEM_PROMPT = """
 당신은 KBO 경기 결과를 전달하는 아침 브리핑 작성자입니다.
 반드시 제공된 팀 이름, 최종 점수, 승리·패전·세이브 투수, 결승타 기록만 사용하세요.
+winner는 승리팀, loser는 패배팀입니다. winning_pitcher는 승리팀의 승리투수이고 losing_pitcher는 패배팀의 패전투수입니다.
+승리투수와 패전투수의 역할을 절대로 서로 바꾸어 표현하지 마세요.
 선수 이름, 경기 장면, 이닝 상황, 경기장, 순위 등 입력에 없는 사실은 추측하지 마세요.
 값이 null이거나 비어 있는 항목은 언급하지 마세요.
 승패와 선수 기록을 자연스러운 한국어로 요약하세요.
@@ -292,6 +296,12 @@ async def fetch_kbo_results(game_date: date) -> list[GameResult]:
 
             _, home_team = get_team(event.get("HOME_ID"), event.get("HOME_NM"))
             _, away_team = get_team(event.get("AWAY_ID"), event.get("AWAY_NM"))
+            if home_score > away_score:
+                winner, loser = home_team, away_team
+            elif away_score > home_score:
+                winner, loser = away_team, home_team
+            else:
+                winner, loser = None, None
             winning_hit = await fetch_winning_hit(client, event, game_date)
 
             games.append(
@@ -301,6 +311,8 @@ async def fetch_kbo_results(game_date: date) -> list[GameResult]:
                     away_team=away_team,
                     home_score=home_score,
                     away_score=away_score,
+                    winner=winner,
+                    loser=loser,
                     winning_pitcher=clean_text(event.get("W_PIT_P_NM")),
                     losing_pitcher=clean_text(event.get("L_PIT_P_NM")),
                     save_pitcher=clean_text(event.get("SV_PIT_P_NM")),

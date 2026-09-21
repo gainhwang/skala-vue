@@ -23,7 +23,7 @@ import { RouterLink, RouterView } from 'vue-router'
     </main>
 
     <footer class="service-footer">
-      OpenWeather 날씨·예보 API · Open-Meteo 대기질 API · Kakao Maps API
+      KBO 공식 경기 데이터 · LangChain AI 브리핑 · OpenWeather 날씨·예보 · Open-Meteo 대기질
     </footer>
   </div>
 </template>

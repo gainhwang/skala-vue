@@ -1,8 +1,9 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { useGameStore } from '@/stores/gameStore'
+import MorningBriefingCard from '@/components/MorningBriefingCard.vue'
 import { findStadium } from '@/data/stadiums'
+import { useGameStore } from '@/stores/gameStore'
 import {
   fetchCurrentWeather,
   getRequestErrorMessage,
@@ -11,14 +12,23 @@ import {
 const gameStore = useGameStore()
 
 const weatherByGame = ref({})
-const isLoading = ref(false)
-const errorMessage = ref('')
+const isWeatherLoading = ref(false)
+const dataErrorMessage = ref('')
+const weatherErrorMessage = ref('')
 
-const todayText = new Intl.DateTimeFormat('ko-KR', {
-  month: 'long',
-  day: 'numeric',
-  weekday: 'long',
-}).format(new Date())
+const isLoading = computed(() => gameStore.isLoading || isWeatherLoading.value)
+
+const todayText = computed(() => {
+  const targetDate = gameStore.loadedDate
+    ? new Date(`${gameStore.loadedDate}T00:00:00`)
+    : new Date()
+
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  }).format(targetDate)
+})
 
 const getTagType = (weatherMain) => {
   if (weatherMain === 'Clear') return 'success'
@@ -28,129 +38,208 @@ const getTagType = (weatherMain) => {
   return 'warning'
 }
 
+const getStatusTagType = (game) => {
+  if (game.isCancelled) return 'danger'
+  if (game.isFinished) return 'success'
+  if (game.status === '경기 중') return 'warning'
+
+  return 'info'
+}
+
 const loadTodayWeather = async () => {
-  isLoading.value = true
-  errorMessage.value = ''
+  weatherByGame.value = {}
+  weatherErrorMessage.value = ''
+
+  if (gameStore.games.length === 0) return
+
+  isWeatherLoading.value = true
 
   try {
-    const entries = await Promise.all(
+    const results = await Promise.allSettled(
       gameStore.games.map(async (game) => {
         const stadium = findStadium(game.stadiumId)
-        const weather = await fetchCurrentWeather(stadium)
 
+        if (!stadium) {
+          throw new Error(`${game.stadiumName}의 좌표 정보가 없습니다.`)
+        }
+
+        const weather = await fetchCurrentWeather(stadium)
         return [game.id, weather]
       }),
     )
 
-    weatherByGame.value = Object.fromEntries(entries)
+    const successfulEntries = results
+      .filter((result) => result.status === 'fulfilled')
+      .map((result) => result.value)
+
+    weatherByGame.value = Object.fromEntries(successfulEntries)
+
+    if (successfulEntries.length !== gameStore.games.length) {
+      weatherErrorMessage.value = '일부 경기장의 날씨를 불러오지 못했습니다.'
+    }
   } catch (error) {
-    errorMessage.value = getRequestErrorMessage(
+    weatherErrorMessage.value = getRequestErrorMessage(
       error,
       '오늘 경기 날씨를 불러오지 못했습니다.',
     )
   } finally {
-    isLoading.value = false
+    isWeatherLoading.value = false
   }
 }
 
-onMounted(loadTodayWeather)
+const loadTodayData = async (force = false) => {
+  dataErrorMessage.value = ''
+
+  try {
+    await gameStore.fetchTodayGames({ force })
+    await loadTodayWeather()
+  } catch {
+    dataErrorMessage.value = gameStore.errorMessage
+  }
+}
+
+onMounted(() => loadTodayData())
 </script>
 
 <template>
-  <section class="today-page">
-    <div class="page-heading">
-      <div>
-        <h2>오늘의 경기</h2>
-        <p>{{ todayText }} · 경기를 선택하면 자세한 관람 정보를 볼 수 있습니다.</p>
+  <div class="today-view">
+    <MorningBriefingCard />
+
+    <section class="today-page">
+      <div class="page-heading">
+        <div>
+          <h2>오늘의 경기</h2>
+          <p>{{ todayText }} · KBO 공식 일정과 구장별 실제 날씨입니다.</p>
+        </div>
+
+        <el-button :loading="isLoading" @click="loadTodayData(true)">
+          경기·날씨 새로고침
+        </el-button>
       </div>
 
-      <el-button :loading="isLoading" @click="loadTodayWeather">
-        날씨 새로고침
-      </el-button>
-    </div>
+      <el-alert
+        v-if="dataErrorMessage"
+        :title="dataErrorMessage"
+        type="error"
+        :closable="false"
+        show-icon
+      />
 
-    <el-alert
-      v-if="errorMessage"
-      :title="errorMessage"
-      type="error"
-      :closable="false"
-      show-icon
-    />
+      <el-alert
+        v-if="weatherErrorMessage"
+        class="weather-alert"
+        :title="weatherErrorMessage"
+        type="warning"
+        :closable="false"
+        show-icon
+      />
 
-    <el-row :gutter="16" class="game-grid">
-      <el-col
-        v-for="game in gameStore.games"
-        :key="game.id"
-        :xs="24"
-        :md="12"
-        class="game-column"
-      >
-        <RouterLink
-          class="game-link"
-          :to="{ name: 'final-game-detail', params: { gameId: game.id } }"
+      <el-skeleton v-if="gameStore.isLoading" :rows="6" animated />
+
+      <el-empty
+        v-else-if="gameStore.games.length === 0 && !dataErrorMessage"
+        description="오늘 예정된 KBO 경기가 없습니다."
+      />
+
+      <el-row v-else :gutter="16" class="game-grid">
+        <el-col
+          v-for="game in gameStore.games"
+          :key="game.id"
+          :xs="24"
+          :md="12"
+          class="game-column"
         >
-          <el-card class="game-card" shadow="hover">
-            <div class="game-meta">
-              <span>{{ game.stadiumName }}</span>
-              <strong>{{ game.startTime }}</strong>
-            </div>
-
-            <div class="matchup">
-              <div
-                class="team-panel"
-                :style="{ borderTopColor: game.homeTeam.color }"
-              >
-                <small>홈</small>
-                <strong class="team-name">
-                  <span
-                    class="team-color-dot"
-                    :style="{ backgroundColor: game.homeTeam.color }"
-                  />
-                  {{ game.homeTeam.name }}
-                </strong>
+          <RouterLink
+            class="game-link"
+            :to="{ name: 'final-game-detail', params: { gameId: game.id } }"
+          >
+            <el-card class="game-card" shadow="hover">
+              <div class="game-meta">
+                <span>{{ game.stadiumName }}</span>
+                <div class="game-status">
+                  <strong>{{ game.startTime }}</strong>
+                  <el-tag :type="getStatusTagType(game)" effect="plain" size="small">
+                    {{ game.status }}
+                  </el-tag>
+                </div>
               </div>
 
-              <span>VS</span>
+              <div class="matchup">
+                <div class="team-panel" :style="{ borderTopColor: game.awayTeam.color }">
+                  <small>원정</small>
+                  <strong class="team-name">
+                    <span
+                      class="team-color-dot"
+                      :style="{ backgroundColor: game.awayTeam.color }"
+                    />
+                    {{ game.awayTeam.name }}
+                  </strong>
+                  <span v-if="game.awayScore !== null" class="team-score">
+                    {{ game.awayScore }}
+                  </span>
+                </div>
+
+                <strong class="versus-text">
+                  {{ game.homeScore !== null && game.awayScore !== null ? ':' : 'VS' }}
+                </strong>
+
+                <div class="team-panel" :style="{ borderTopColor: game.homeTeam.color }">
+                  <small>홈</small>
+                  <strong class="team-name">
+                    <span
+                      class="team-color-dot"
+                      :style="{ backgroundColor: game.homeTeam.color }"
+                    />
+                    {{ game.homeTeam.name }}
+                  </strong>
+                  <span v-if="game.homeScore !== null" class="team-score">
+                    {{ game.homeScore }}
+                  </span>
+                </div>
+              </div>
 
               <div
-                class="team-panel"
-                :style="{ borderTopColor: game.awayTeam.color }"
+                v-if="game.awayStartingPitcher || game.homeStartingPitcher"
+                class="pitcher-line"
               >
-                <small>원정</small>
-                <strong class="team-name">
-                  <span
-                    class="team-color-dot"
-                    :style="{ backgroundColor: game.awayTeam.color }"
-                  />
-                  {{ game.awayTeam.name }}
-                </strong>
+                <span>{{ game.awayStartingPitcher || '미정' }}</span>
+                <small>선발투수</small>
+                <span>{{ game.homeStartingPitcher || '미정' }}</span>
               </div>
-            </div>
 
-            <el-skeleton v-if="isLoading" :rows="1" animated />
+              <el-skeleton v-if="isWeatherLoading" :rows="1" animated />
 
-            <div v-else-if="weatherByGame[game.id]" class="weather-summary">
-              <el-tag
-                :type="getTagType(weatherByGame[game.id].weather[0].main)"
-                effect="plain"
-              >
-                {{ weatherByGame[game.id].weather[0].description }}
-              </el-tag>
-              <span>현재 {{ weatherByGame[game.id].main.temp.toFixed(1) }}℃</span>
-              <span>습도 {{ weatherByGame[game.id].main.humidity }}%</span>
-            </div>
+              <div v-else-if="weatherByGame[game.id]" class="weather-summary">
+                <el-tag
+                  :type="getTagType(weatherByGame[game.id].weather[0].main)"
+                  effect="plain"
+                >
+                  {{ weatherByGame[game.id].weather[0].description }}
+                </el-tag>
+                <span>현재 {{ weatherByGame[game.id].main.temp.toFixed(1) }}℃</span>
+                <span>습도 {{ weatherByGame[game.id].main.humidity }}%</span>
+              </div>
 
-            <p v-else class="weather-empty">날씨 정보를 확인해 주세요.</p>
+              <p v-else class="weather-empty">날씨 정보를 확인해 주세요.</p>
 
-            <div class="detail-text">경기 상세 보기 →</div>
-          </el-card>
-        </RouterLink>
-      </el-col>
-    </el-row>
-  </section>
+              <div class="detail-text">경기 상세 보기 →</div>
+            </el-card>
+          </RouterLink>
+        </el-col>
+      </el-row>
+
+      <p v-if="gameStore.sourceNote" class="source-note">{{ gameStore.sourceNote }}</p>
+    </section>
+  </div>
 </template>
 
 <style scoped>
+.today-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
 .today-page {
   padding: 1.5rem;
   border: 1px solid #dfe5ec;
@@ -158,11 +247,22 @@ onMounted(loadTodayWeather)
   background: #fff;
 }
 
-.page-heading {
+.page-heading,
+.game-meta,
+.game-status,
+.weather-summary,
+.pitcher-line {
   display: flex;
   align-items: center;
+}
+
+.page-heading,
+.game-meta {
   justify-content: space-between;
   gap: 1rem;
+}
+
+.page-heading {
   margin-bottom: 1.25rem;
 }
 
@@ -173,6 +273,10 @@ onMounted(loadTodayWeather)
 .page-heading p {
   margin: 0.4rem 0 0;
   color: #6b7785;
+}
+
+.weather-alert {
+  margin-top: 0.75rem;
 }
 
 .game-grid {
@@ -198,18 +302,14 @@ onMounted(loadTodayWeather)
   height: 100%;
 }
 
-.game-meta,
-.weather-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
 .game-meta {
   padding-bottom: 0.75rem;
   color: #6b7785;
   border-bottom: 1px solid #ebeef5;
+}
+
+.game-status {
+  gap: 0.6rem;
 }
 
 .matchup {
@@ -217,7 +317,7 @@ onMounted(loadTodayWeather)
   grid-template-columns: 1fr auto 1fr;
   gap: 1rem;
   align-items: center;
-  padding: 1.25rem 0;
+  padding: 1.25rem 0 0.75rem;
   text-align: center;
 }
 
@@ -246,13 +346,45 @@ onMounted(loadTodayWeather)
   border-radius: 50%;
 }
 
+.team-score {
+  color: #25364a;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.versus-text {
+  color: #6b7785;
+}
+
+.pitcher-line {
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  color: #526273;
+  font-size: 0.85rem;
+  border-radius: 6px;
+  background: #f7f9fc;
+}
+
+.pitcher-line span {
+  flex: 1;
+}
+
+.pitcher-line span:last-child {
+  text-align: right;
+}
+
+.pitcher-line small,
 .matchup small,
-.weather-empty {
+.weather-empty,
+.source-note {
   color: #8492a6;
 }
 
 .weather-summary {
   justify-content: flex-start;
+  gap: 0.75rem;
   padding: 0.75rem;
   font-size: 0.9rem;
   border-radius: 6px;
@@ -270,6 +402,12 @@ onMounted(loadTodayWeather)
   margin-top: 1rem;
   color: #409eff;
   font-size: 0.9rem;
+  text-align: right;
+}
+
+.source-note {
+  margin: 1rem 0 0;
+  font-size: 0.8rem;
   text-align: right;
 }
 

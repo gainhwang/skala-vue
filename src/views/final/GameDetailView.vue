@@ -32,6 +32,8 @@ const errorMessage = ref('')
 const customItemName = ref('')
 const customItemError = ref('')
 
+const isPageLoading = computed(() => gameStore.isLoading || isLoading.value)
+
 const game = computed(() => {
   return gameStore.games.find((item) => item.id === props.gameId)
 })
@@ -209,11 +211,28 @@ const loadGameDetail = async () => {
   }
 }
 
-watch(() => props.gameId, loadGameDetail, { immediate: true })
+const loadPage = async () => {
+  if (!game.value) {
+    try {
+      await gameStore.fetchTodayGames()
+    } catch {
+      errorMessage.value = gameStore.errorMessage
+      return
+    }
+  }
+
+  await loadGameDetail()
+}
+
+watch(() => props.gameId, loadPage, { immediate: true })
 </script>
 
 <template>
-  <section v-if="game && stadium" class="detail-page">
+  <section v-if="isPageLoading && !game" class="detail-page">
+    <el-skeleton :rows="10" animated />
+  </section>
+
+  <section v-else-if="game && stadium" class="detail-page">
     <el-page-header class="detail-heading" title="오늘의 경기" @back="goBackToGames">
       <template #content>
         <div class="match-title">
@@ -408,7 +427,7 @@ watch(() => props.gameId, loadGameDetail, { immediate: true })
     </template>
   </section>
 
-  <el-empty v-else description="경기 정보를 찾을 수 없습니다.">
+  <el-empty v-else :description="gameStore.errorMessage || '경기 정보를 찾을 수 없습니다.'">
     <RouterLink :to="{ name: 'weather-final' }">오늘의 경기로 돌아가기</RouterLink>
   </el-empty>
 </template>

@@ -1,9 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import {
-  fetchYesterdayBriefing,
-  getKboApiErrorMessage,
-} from '@/services/kboApi'
+import { teams } from '@/data/teams'
+import { fetchLatestBriefing, getKboApiErrorMessage } from '@/services/kboApi'
 
 const briefing = ref(null)
 const isLoading = ref(false)
@@ -20,16 +18,40 @@ const briefingDate = computed(() => {
   }).format(new Date(`${briefing.value.date}T00:00:00`))
 })
 
+const isWinner = (game, teamName) => game.winner === teamName
+
+const hexToRgba = (hex, alpha) => {
+  const value = hex.replace('#', '')
+  const red = Number.parseInt(value.slice(0, 2), 16)
+  const green = Number.parseInt(value.slice(2, 4), 16)
+  const blue = Number.parseInt(value.slice(4, 6), 16)
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+}
+
+const getWinnerStyle = (game, teamName) => {
+  if (!isWinner(game, teamName)) return undefined
+
+  const team = teams.find((item) => item.name === teamName)
+  if (!team) return undefined
+
+  return {
+    color: team.color,
+    backgroundColor: hexToRgba(team.color, 0.12),
+    borderColor: hexToRgba(team.color, 0.38),
+  }
+}
+
 const loadBriefing = async () => {
   isLoading.value = true
   errorMessage.value = ''
 
   try {
-    briefing.value = await fetchYesterdayBriefing()
+    briefing.value = await fetchLatestBriefing()
   } catch (error) {
     errorMessage.value = getKboApiErrorMessage(
       error,
-      '어제의 AI 경기 브리핑을 불러오지 못했습니다.',
+      '직전 경기의 AI 브리핑을 불러오지 못했습니다.',
     )
   } finally {
     isLoading.value = false
@@ -48,7 +70,7 @@ onMounted(loadBriefing)
             <h2>AI KBO 모닝 브리핑</h2>
             <el-tag type="success" effect="dark" size="small">LangChain</el-tag>
           </div>
-          <p>어제의 공식 경기 기록을 AI가 간단히 정리해 드립니다.</p>
+          <p>가장 최근에 완료된 공식 경기 기록을 AI가 경기별로 정리합니다.</p>
         </div>
 
         <el-button :loading="isLoading" @click="loadBriefing">다시 생성</el-button>
@@ -68,7 +90,7 @@ onMounted(loadBriefing)
     <template v-else-if="briefing">
       <el-empty
         v-if="briefing.total_games === 0"
-        description="어제 완료된 KBO 경기가 없습니다."
+        description="최근 완료된 KBO 경기를 찾지 못했습니다."
       />
 
       <template v-else>
@@ -78,15 +100,28 @@ onMounted(loadBriefing)
             <span>{{ briefing.total_games }}경기</span>
           </div>
           <h3>{{ briefing.headline }}</h3>
-          <p>{{ briefing.summary }}</p>
         </div>
 
         <div class="result-grid">
           <article v-for="game in briefing.games" :key="game.id" class="result-item">
             <div class="score-line">
-              <span>{{ game.away_team }}</span>
+              <span
+                class="team-name"
+                :class="{ 'is-winner': isWinner(game, game.away_team) }"
+                :style="getWinnerStyle(game, game.away_team)"
+              >
+                <small v-if="isWinner(game, game.away_team)">승</small>
+                {{ game.away_team }}
+              </span>
               <strong>{{ game.away_score }} : {{ game.home_score }}</strong>
-              <span>{{ game.home_team }}</span>
+              <span
+                class="team-name home-team"
+                :class="{ 'is-winner': isWinner(game, game.home_team) }"
+                :style="getWinnerStyle(game, game.home_team)"
+              >
+                {{ game.home_team }}
+                <small v-if="isWinner(game, game.home_team)">승</small>
+              </span>
             </div>
 
             <div class="record-list">
@@ -95,6 +130,11 @@ onMounted(loadBriefing)
               <span v-if="game.save_pitcher"><b>세이브</b> {{ game.save_pitcher }}</span>
               <span v-if="game.winning_hit"><b>결승타</b> {{ game.winning_hit }}</span>
             </div>
+
+            <p class="game-summary">
+              <b>AI 브리핑</b>
+              {{ game.ai_summary }}
+            </p>
           </article>
         </div>
 
@@ -132,8 +172,7 @@ onMounted(loadBriefing)
   margin: 0;
 }
 
-.briefing-heading p,
-.ai-summary p {
+.briefing-heading p {
   margin: 0.45rem 0 0;
   line-height: 1.65;
   color: #526273;
@@ -165,13 +204,30 @@ onMounted(loadBriefing)
   gap: 0.75rem;
 }
 
-.score-line span {
+.team-name {
   flex: 1;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
   font-weight: 600;
 }
 
-.score-line span:last-child {
+.team-name.home-team {
   text-align: right;
+}
+
+.team-name.is-winner {
+  font-weight: 700;
+}
+
+.team-name small {
+  margin-right: 0.25rem;
+  font-size: 0.68rem;
+}
+
+.team-name.home-team small {
+  margin-right: 0;
+  margin-left: 0.25rem;
 }
 
 .score-line strong {
@@ -194,6 +250,23 @@ onMounted(loadBriefing)
 .record-list b {
   margin-right: 0.35rem;
   color: #34495e;
+}
+
+.game-summary {
+  padding: 0.75rem;
+  margin: 0.85rem 0 0;
+  color: #42566c;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  background: #f4f7fb;
+  border-radius: 6px;
+}
+
+.game-summary b {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #245da8;
+  font-size: 0.76rem;
 }
 
 .source-note {

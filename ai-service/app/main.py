@@ -20,6 +20,7 @@ KBO_BOX_SCORE_URL = (
     "https://www.koreabaseball.com/ws/Schedule.asmx/GetBoxScoreScroll"
 )
 KBO_SERIES_IDS = "0,1,3,4,5,6,7,8,9"
+RECENT_GAME_LOOKBACK_DAYS = 14
 KBO_HEADERS = {
     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
     "X-Requested-With": "XMLHttpRequest",
@@ -42,7 +43,7 @@ KBO_TEAMS = {
 
 app = FastAPI(
     title="KBO Morning Briefing AI Service",
-    description="전날 KBO 경기 결과를 LangChain으로 요약하는 API",
+    description="직전 KBO 경기 결과를 LangChain으로 요약하는 API",
     version="0.1.0",
 )
 
@@ -73,6 +74,7 @@ class GameResult(BaseModel):
     losing_pitcher: str | None = None
     save_pitcher: str | None = None
     winning_hit: str | None = None
+    ai_summary: str | None = None
 
 
 class TodayGame(BaseModel):
@@ -100,10 +102,17 @@ class TodayGamesResponse(BaseModel):
     source_note: str
 
 
-class BriefingCopy(BaseModel):
-    headline: str = Field(description="전날 경기 결과를 표현하는 짧은 한국어 제목")
+class GameBriefingCopy(BaseModel):
+    game_id: str = Field(description="입력으로 제공된 경기의 id")
     summary: str = Field(
-        description="제공된 경기 기록만 근거로 작성한 3~5문장의 한국어 요약"
+        description="해당 경기 기록만 근거로 작성한 1~2문장의 한국어 요약"
+    )
+
+
+class BriefingCopy(BaseModel):
+    headline: str = Field(description="직전 경기일의 결과를 표현하는 짧은 한국어 제목")
+    game_briefings: list[GameBriefingCopy] = Field(
+        description="입력된 모든 경기를 같은 순서로 하나씩 요약한 목록"
     )
 
 
@@ -123,7 +132,9 @@ winner는 승리팀, loser는 패배팀입니다. winning_pitcher는 승리팀�
 승리투수와 패전투수의 역할을 절대로 서로 바꾸어 표현하지 마세요.
 선수 이름, 경기 장면, 이닝 상황, 경기장, 순위 등 입력에 없는 사실은 추측하지 마세요.
 값이 null이거나 비어 있는 항목은 언급하지 마세요.
-승패와 선수 기록을 자연스러운 한국어로 요약하세요.
+각 경기마다 입력의 id를 game_id에 그대로 복사하고, 1~2문장으로 각각 요약하세요.
+입력된 모든 경기를 빠짐없이 같은 순서로 game_briefings에 포함하세요.
+서로 다른 경기의 선수 기록을 섞지 마세요.
 과장된 표현이나 특정 팀을 비하하는 표현은 사용하지 마세요.
 """.strip()
 
@@ -134,7 +145,7 @@ USER_PROMPT = """
 [최종 경기 결과 JSON]
 {game_results}
 
-이 결과를 바탕으로 짧은 제목과 3~5문장의 아침 브리핑을 작성하세요.
+이 결과를 바탕으로 전체 제목 하나와 경기별 1~2문장의 브리핑을 작성하세요.
 """.strip()
 
 
@@ -323,6 +334,30 @@ async def fetch_kbo_results(game_date: date) -> list[GameResult]:
     return games
 
 
+async def find_latest_kbo_results(
+    start_date: date,
+    lookback_days: int = RECENT_GAME_LOOKBACK_DAYS,
+) -> tuple[date, list[GameResult]]:
+    for days_ago in range(lookback_days):
+        candidate_date = start_date - timedelta(days=days_ago)
+        games = await fetch_kbo_results(candidate_date)
+        if games:
+            return candidate_date, games
+
+    return start_date, []
+
+
+def build_game_summary_fallback(game: GameResult) -> str:
+    score = (
+        f"{game.away_team} {game.away_score}-{game.home_score} "
+        f"{game.home_team} 경기"
+    )
+    if game.winner:
+        return f"{score}에서 {game.winner}가 승리했습니다."
+
+    return f"{score}는 무승부로 끝났습니다."
+
+
 def create_briefing_chain():
     if not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(
@@ -369,20 +404,32 @@ async def get_today_games(
     )
 
 
-@app.post("/api/briefings/yesterday", response_model=MorningBriefingResponse)
-async def create_yesterday_briefing(
+@app.post("/api/briefings/latest", response_model=MorningBriefingResponse)
+@app.post(
+    "/api/briefings/yesterday",
+    response_model=MorningBriefingResponse,
+    include_in_schema=False,
+)
+async def create_latest_briefing(
     game_date: date | None = Query(default=None, alias="date"),
 ):
-    target_date = game_date or yesterday_in_korea()
-    games = await fetch_kbo_results(target_date)
+    if game_date:
+        target_date = game_date
+        games = await fetch_kbo_results(target_date)
+    else:
+        target_date, games = await find_latest_kbo_results(yesterday_in_korea())
+
     source_note = "KBO 공식 홈페이지 경기 기록 기준입니다."
 
     if not games:
         return MorningBriefingResponse(
             date=target_date,
             total_games=0,
-            headline="어제는 완료된 KBO 경기가 없었습니다",
-            summary="확인 가능한 경기 결과가 없어 오늘의 브리핑을 쉬어갑니다.",
+            headline="최근 완료된 KBO 경기를 찾지 못했습니다",
+            summary=(
+                f"최근 {RECENT_GAME_LOOKBACK_DAYS}일 동안 확인 가능한 "
+                "경기 결과가 없습니다."
+            ),
             games=[],
             source_note=source_note,
         )
@@ -403,11 +450,30 @@ async def create_yesterday_briefing(
             detail="AI 브리핑 생성에 실패했습니다.",
         ) from exc
 
+    valid_game_ids = {game.id for game in games}
+    summaries_by_id = {
+        item.game_id: item.summary
+        for item in briefing.game_briefings
+        if item.game_id in valid_game_ids
+    }
+    games_with_summaries = [
+        game.model_copy(
+            update={
+                "ai_summary": summaries_by_id.get(game.id)
+                or build_game_summary_fallback(game)
+            }
+        )
+        for game in games
+    ]
+    combined_summary = "\n".join(
+        game.ai_summary or "" for game in games_with_summaries
+    )
+
     return MorningBriefingResponse(
         date=target_date,
         total_games=len(games),
         headline=briefing.headline,
-        summary=briefing.summary,
-        games=games,
+        summary=combined_summary,
+        games=games_with_summaries,
         source_note=source_note,
     )

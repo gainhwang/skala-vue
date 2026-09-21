@@ -15,8 +15,8 @@ export const fetchTodayGames = async (date) => {
   return response.data
 }
 
-export const fetchYesterdayBriefing = async (date) => {
-  const response = await kboApi.post('/api/briefings/yesterday', null, {
+export const fetchLatestBriefing = async (date) => {
+  const response = await kboApi.post('/api/briefings/latest', null, {
     params: date ? { date } : undefined,
   })
 

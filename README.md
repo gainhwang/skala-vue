@@ -3,7 +3,9 @@
 KBO 경기 관람 전에 오늘의 실제 경기 일정, 구장 날씨, 대기질과 준비물을 한 번에 확인하는 Vue 3 프로젝트입니다. FastAPI와 LangChain을 연결해 가장 최근에 완료된 경기 결과를 한국어 모닝 브리핑으로 요약하는 AI 기능도 제공합니다. 수업 과제를 단계별로 보관하면서, 각 단계에서 학습한 기능을 하나의 최종 서비스로 통합했습니다.
 
 - GitHub: https://github.com/gainhwang/skala-vue
-- 배포 주소: https://skala-vue-tan.vercel.app/
+- 프론트엔드 배포 주소: https://skala-vue-tan.vercel.app/
+
+> Vercel 주소는 Vue 프론트엔드 미리보기입니다. 오늘의 실제 KBO 경기와 AI 모닝 브리핑은 별도의 FastAPI 서버가 필요하며, 현재 제출본에서는 아래 실행 방법에 따라 로컬에서 확인할 수 있습니다.
 
 ## 주요 기능
 
@@ -232,7 +234,7 @@ npm run build
 npm run preview
 ```
 
-## 배포 방법
+## 프론트엔드 배포와 AI 실행 범위
 
 1. GitHub 저장소를 Vercel에 연결합니다.
 2. Vercel 프로젝트 환경변수에 아래 값을 등록합니다.
@@ -243,9 +245,11 @@ npm run preview
 3. Build Command는 `npm run build`, Output Directory는 `dist`로 설정합니다.
 4. 배포된 도메인을 카카오 디벨로퍼스의 JavaScript SDK 도메인에 추가합니다.
 5. 배포 화면의 새로고침과 동적 경로 접근을 확인합니다. `vercel.json`에 SPA rewrite가 설정되어 있습니다.
-6. 이 README 상단의 배포 주소를 실제 URL로 교체합니다.
+6. 이 README 상단의 프론트엔드 배포 주소에서 화면 접근을 확인합니다.
 
-Vue와 FastAPI는 별도의 서버입니다. AI 기능까지 배포하려면 FastAPI 서버를 배포한 뒤 프론트엔드의 `VITE_AI_API_BASE_URL`을 해당 주소로 설정해야 합니다. 로컬 시연에서는 위의 두 터미널 실행 방법을 사용하면 됩니다.
+Vue와 FastAPI는 별도의 서버입니다. 현재 Vercel에는 Vue 프론트엔드만 배포되어 있으므로 오늘의 KBO 경기와 AI 모닝 브리핑은 로컬 시연 환경에서 제공합니다. AI 기능까지 공개 배포하려면 FastAPI 서버를 별도로 배포한 뒤 프론트엔드의 `VITE_AI_API_BASE_URL`을 해당 주소로 설정해야 합니다.
+
+수업에서 발급받은 OpenAI API 키의 불필요한 공개 사용을 막기 위해, 제출 및 발표에서는 위의 두 터미널 실행 방법으로 로컬 시연하는 것을 기준으로 합니다.
 
 ## Notebook 제출
 

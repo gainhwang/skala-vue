@@ -6,7 +6,7 @@ import { RouterLink, RouterView } from 'vue-router'
   <div class="final-layout">
     <header class="service-header">
       <div class="service-title">
-        <h1>⚾직관 날씨요정</h1>
+        <h1>⚾ 직관 날씨요정</h1>
         <p>경기와 날씨를 확인하고 필요한 준비물을 챙겨 보세요.</p>
       </div>
 
@@ -23,7 +23,7 @@ import { RouterLink, RouterView } from 'vue-router'
     </main>
 
     <footer class="service-footer">
-      OpenWeather 날씨·예보 API · Open-Meteo 대기질 API · Kakao Maps API
+      KBO 공식 경기 데이터 · LangChain AI 브리핑 · OpenWeather 날씨·예보 · Open-Meteo 대기질
     </footer>
   </div>
 </template>

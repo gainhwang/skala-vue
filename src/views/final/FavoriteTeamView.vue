@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 
 const gameStore = useGameStore()
@@ -44,6 +44,10 @@ watch(
   },
   { immediate: true },
 )
+
+onMounted(() => {
+  gameStore.fetchTodayGames().catch(() => {})
+})
 </script>
 
 <template>
@@ -80,8 +84,18 @@ watch(
       </div>
     </div>
 
+    <el-alert
+      v-if="gameStore.errorMessage"
+      :title="gameStore.errorMessage"
+      type="error"
+      :closable="false"
+      show-icon
+    />
+
+    <el-skeleton v-if="gameStore.isLoading" class="favorite-loading" :rows="5" animated />
+
     <el-card
-      v-if="favoriteGame"
+      v-else-if="favoriteGame"
       class="favorite-game-card"
       shadow="never"
       :style="{ borderLeftColor: selectedTeam?.color }"
@@ -147,6 +161,12 @@ watch(
 
       <p class="local-note">응원 수는 현재 브라우저에서 누른 횟수입니다.</p>
     </el-card>
+
+    <el-empty
+      v-else-if="!gameStore.errorMessage"
+      class="favorite-empty"
+      description="오늘 선택한 구단의 예정 경기가 없습니다."
+    />
 
     <el-row :gutter="16" class="link-grid">
       <el-col :xs="24" :md="12" class="link-column">
@@ -244,6 +264,8 @@ watch(
 }
 
 .favorite-game-card,
+.favorite-loading,
+.favorite-empty,
 .link-grid {
   margin-top: 1rem;
 }

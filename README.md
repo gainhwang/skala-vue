@@ -1,6 +1,6 @@
 # KBO 야구장 직관 날씨 & AI 모닝 브리핑
 
-KBO 경기 관람 전에 오늘의 실제 경기 일정, 구장 날씨, 대기질과 준비물을 한 번에 확인하는 Vue 3 프로젝트입니다. FastAPI와 LangChain을 연결해 가장 최근에 완료된 경기 결과를 한국어 모닝 브리핑으로 요약하는 AI 기능도 제공합니다. 수업 과제를 단계별로 보관하면서, 각 단계에서 학습한 기능을 하나의 최종 서비스로 통합했습니다.
+KBO 경기 관람 전에 오늘의 실제 경기 일정, 구장 날씨, 대기질과 준비물을 한 번에 확인하는 Vue 3 프로젝트입니다. FastAPI와 LangChain을 연결해 가장 최근에 완료된 경기 결과를 한국어 모닝 브리핑으로 요약하고, 취향을 바탕으로 응원 구단을 추천하는 **야구팀 돌잡이** 기능도 제공합니다. 수업 과제를 단계별로 보관하면서, 각 단계에서 학습한 기능을 하나의 최종 서비스로 통합했습니다.
 
 - GitHub: https://github.com/gainhwang/skala-vue
 - 프론트엔드 배포 주소: https://skala-vue-tan.vercel.app/
@@ -50,6 +50,16 @@ KBO 경기 관람 전에 오늘의 실제 경기 일정, 구장 날씨, 대기�
 - 선택한 구단의 실제 당일 경기와 응원 대결 표시
 - 구단 응원가 YouTube 검색
 - KBO 예매 안내와 각 구단 공식 홈페이지 연결
+
+### 야구팀 돌잡이
+
+- 좋아하는 지역, 색상, 응원 문화, 직관 분위기를 자유 문장으로 입력
+- FastAPI·OpenAI 구조화 출력으로 10개 KBO 구단 가운데 가장 어울리는 구단과 차선 구단 추천
+- 추천 근거, 구단의 응원·직관 특징, 응원 시작 팁을 결과 카드로 제공
+- 마스코트 룰렛 애니메이션과 예시 입력으로 처음 보는 사용자도 쉽게 참여
+- 결과에서 추천 구단을 바로 `MY 구단`으로 저장
+
+> 야구팀 돌잡이와 AI 모닝 브리핑은 OpenAI API 키가 설정된 FastAPI 서버가 필요합니다. 오늘의 경기·날씨·구장 가이드·MY 구단 기본 기능은 해당 키 없이도 각 외부 API 설정 범위에서 사용할 수 있습니다.
 
 ## 과제 요구사항 충족 현황
 
@@ -127,6 +137,7 @@ KBO 경기 관람 전에 오늘의 실제 경기 일정, 구장 날씨, 대기�
 | `/game/:gameId`         | 경기 구장 날씨 상세        |
 | `/stadiums`             | 전국 구장 지도와 주변 장소 |
 | `/favorite`             | MY 구단과 응원 기능        |
+| `/team-doljabi`         | 취향 기반 야구팀 돌잡이   |
 | `/exercise/mockup`      | 1단계 Mockup 과제          |
 | `/exercise/composition` | 2단계 Composition API 과제 |
 | `/exercise/component`   | 3단계 Components 과제      |
@@ -150,7 +161,7 @@ src/
 ├── stores/                # 단위, 경기, 준비물 Pinia Store
 └── views/
     ├── exercise/          # 1~6단계 과제 화면
-    └── final/             # 최종 UI 화면
+    └── final/             # 오늘의 경기, MY 구단, 돌잡이 등 최종 UI 화면
 ```
 
 ## 실행 방법
@@ -206,6 +217,8 @@ FRONTEND_ORIGIN=http://localhost:5173
 
 `ai-service/.env`도 Git에 업로드되지 않습니다. API 키는 README, 소스 코드, Notebook에 직접 적지 않습니다.
 
+가상환경은 프로젝트 루트가 아니라 `ai-service/.venv`에 만들어집니다. 따라서 루트에서 `source .venv/bin/activate`를 실행하면 경로를 찾지 못합니다.
+
 ### 5. 개발 서버 실행
 
 터미널을 두 개 열어 AI 서버와 Vue 개발 서버를 각각 실행합니다.
@@ -213,9 +226,17 @@ FRONTEND_ORIGIN=http://localhost:5173
 터미널 1 - AI 서버:
 
 ```sh
+# 프로젝트 루트에서 실행
 cd ai-service
 source .venv/bin/activate
 uvicorn app.main:app --reload --port 8000
+```
+
+아래 응답이 보이면 API 서버가 정상 실행된 것입니다.
+
+```sh
+curl http://localhost:8000/health
+# {"status":"ok"}
 ```
 
 터미널 2 - Vue:
@@ -226,7 +247,16 @@ npm run dev
 
 브라우저에서 `http://localhost:5173`을 열고, AI API 문서는 `http://localhost:8000/docs`에서 확인합니다.
 
-### 6. 코드 검사와 빌드
+### 6. 야구팀 돌잡이 사용 방법
+
+1. 위 절차대로 AI 서버와 Vue 서버를 모두 실행합니다.
+2. `http://localhost:5173/team-doljabi`로 이동합니다.
+3. 지역, 좋아하는 색, 응원 분위기, 직관 취향 중 두 가지 이상을 문장으로 입력하거나 예시 버튼을 선택합니다.
+4. **나의 야구팀 뽑기**를 누르면 추천 구단과 이유를 확인할 수 있습니다. 결과의 버튼으로 `MY 구단`에 저장할 수 있습니다.
+
+`OPENAI_API_KEY`가 없거나 유효하지 않으면 돌잡이는 `503` 또는 인증 오류를 표시합니다. 이 경우 `ai-service/.env`의 키를 확인한 뒤 AI 서버를 다시 시작합니다.
+
+### 7. 코드 검사와 빌드
 
 ```sh
 npm run lint
@@ -247,7 +277,7 @@ npm run preview
 5. 배포 화면의 새로고침과 동적 경로 접근을 확인합니다. `vercel.json`에 SPA rewrite가 설정되어 있습니다.
 6. 이 README 상단의 프론트엔드 배포 주소에서 화면 접근을 확인합니다.
 
-Vue와 FastAPI는 별도의 서버입니다. 현재 Vercel에는 Vue 프론트엔드만 배포되어 있으므로 오늘의 KBO 경기와 AI 모닝 브리핑은 로컬 시연 환경에서 제공합니다. AI 기능까지 공개 배포하려면 FastAPI 서버를 별도로 배포한 뒤 프론트엔드의 `VITE_AI_API_BASE_URL`을 해당 주소로 설정해야 합니다.
+Vue와 FastAPI는 별도의 서버입니다. 현재 Vercel에는 Vue 프론트엔드만 배포되어 있으므로 오늘의 KBO 경기, AI 모닝 브리핑, 야구팀 돌잡이는 로컬 시연 환경에서 제공합니다. 이 기능까지 공개 배포하려면 FastAPI 서버를 별도로 배포한 뒤 프론트엔드의 `VITE_AI_API_BASE_URL`을 해당 주소로 설정해야 합니다.
 
 수업에서 발급받은 OpenAI API 키의 불필요한 공개 사용을 막기 위해, 제출 및 발표에서는 위의 두 터미널 실행 방법으로 로컬 시연하는 것을 기준으로 합니다.
 

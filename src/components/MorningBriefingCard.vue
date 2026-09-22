@@ -1,11 +1,17 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { teams } from '@/data/teams'
-import { fetchLatestBriefing, getKboApiErrorMessage } from '@/services/kboApi'
+import {
+  fetchLatestBriefing,
+  fetchLatestResults,
+  getKboApiErrorMessage,
+} from '@/services/kboApi'
 
 const briefing = ref(null)
 const isLoading = ref(false)
+const isAiLoading = ref(false)
 const errorMessage = ref('')
+const aiErrorMessage = ref('')
 
 const briefingDate = computed(() => {
   if (!briefing.value?.date) return ''
@@ -19,6 +25,10 @@ const briefingDate = computed(() => {
 })
 
 const isWinner = (game, teamName) => game.winner === teamName
+
+const hasAiBriefing = computed(() => {
+  return briefing.value?.games?.some((game) => game.ai_summary) ?? false
+})
 
 const hexToRgba = (hex, alpha) => {
   const value = hex.replace('#', '')
@@ -42,23 +52,42 @@ const getWinnerStyle = (game, teamName) => {
   }
 }
 
-const loadBriefing = async () => {
+const loadResults = async () => {
   isLoading.value = true
   errorMessage.value = ''
+  aiErrorMessage.value = ''
 
   try {
-    briefing.value = await fetchLatestBriefing()
+    briefing.value = await fetchLatestResults()
   } catch (error) {
     errorMessage.value = getKboApiErrorMessage(
       error,
-      '직전 경기의 AI 브리핑을 불러오지 못했습니다.',
+      '직전 KBO 경기 결과를 불러오지 못했습니다.',
     )
   } finally {
     isLoading.value = false
   }
 }
 
-onMounted(loadBriefing)
+const generateAiBriefing = async () => {
+  if (!briefing.value?.date || briefing.value.total_games === 0) return
+
+  isAiLoading.value = true
+  aiErrorMessage.value = ''
+
+  try {
+    briefing.value = await fetchLatestBriefing(briefing.value.date)
+  } catch (error) {
+    aiErrorMessage.value = getKboApiErrorMessage(
+      error,
+      'AI 브리핑을 생성하지 못했습니다.',
+    )
+  } finally {
+    isAiLoading.value = false
+  }
+}
+
+onMounted(loadResults)
 </script>
 
 <template>
@@ -67,13 +96,23 @@ onMounted(loadBriefing)
       <div class="briefing-heading">
         <div>
           <div class="title-line">
-            <h2>AI KBO 모닝 브리핑</h2>
-            <el-tag type="success" effect="dark" size="small">LangChain</el-tag>
+            <h2>직전 KBO 경기 결과</h2>
+            <el-tag v-if="hasAiBriefing" type="success" effect="dark" size="small">
+              LangChain
+            </el-tag>
           </div>
-          <p>가장 최근에 완료된 공식 경기 기록을 AI가 경기별로 정리합니다.</p>
+          <p>KBO 공식 기록은 자동으로 표시하고, AI 요약은 원할 때만 생성합니다.</p>
         </div>
 
-        <el-button :loading="isLoading" @click="loadBriefing">다시 생성</el-button>
+        <el-button
+          type="primary"
+          plain
+          :loading="isAiLoading"
+          :disabled="isLoading || !briefing || briefing.total_games === 0"
+          @click="generateAiBriefing"
+        >
+          {{ hasAiBriefing ? 'AI 브리핑 다시 만들기' : 'AI 브리핑 만들기' }}
+        </el-button>
       </div>
     </template>
 
@@ -98,9 +137,22 @@ onMounted(loadBriefing)
           <div class="summary-meta">
             <el-tag type="info" effect="plain">{{ briefingDate }}</el-tag>
             <span>{{ briefing.total_games }}경기</span>
+            <span v-if="!hasAiBriefing" class="no-token-label">OpenAI 미사용</span>
           </div>
-          <h3>{{ briefing.headline }}</h3>
+          <h3 v-if="hasAiBriefing">{{ briefing.headline }}</h3>
+          <p v-else class="ai-guide">
+            점수와 선수 기록은 KBO 데이터입니다. 위 버튼을 누르면 경기별 AI 요약이 추가됩니다.
+          </p>
         </div>
+
+        <el-alert
+          v-if="aiErrorMessage"
+          class="ai-error"
+          :title="aiErrorMessage"
+          type="error"
+          :closable="false"
+          show-icon
+        />
 
         <div class="result-grid">
           <article v-for="game in briefing.games" :key="game.id" class="result-item">
@@ -131,7 +183,7 @@ onMounted(loadBriefing)
               <span v-if="game.winning_hit"><b>결승타</b> {{ game.winning_hit }}</span>
             </div>
 
-            <p class="game-summary">
+            <p v-if="game.ai_summary" class="game-summary">
               <b>AI 브리핑</b>
               {{ game.ai_summary }}
             </p>
@@ -183,6 +235,24 @@ onMounted(loadBriefing)
   margin-bottom: 0.75rem;
   color: #6b7785;
   font-size: 0.9rem;
+}
+
+.no-token-label {
+  padding: 0.2rem 0.5rem;
+  color: #526a58;
+  font-size: 0.75rem;
+  border-radius: 999px;
+  background: #eaf5ec;
+}
+
+.ai-guide {
+  margin: 0;
+  color: #596b7e;
+  line-height: 1.6;
+}
+
+.ai-error {
+  margin-top: 1rem;
 }
 
 .result-grid {

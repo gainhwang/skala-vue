@@ -31,6 +31,11 @@ const router = createRouter({
           name: 'final-favorite',
           component: () => import('@/views/final/FavoriteTeamView.vue'),
         },
+        {
+          path: 'team-doljabi',
+          name: 'final-team-doljabi',
+          component: () => import('@/views/final/TeamDoljabiView.vue'),
+        },
       ],
     },
     {

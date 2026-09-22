@@ -14,6 +14,7 @@ import { RouterLink, RouterView } from 'vue-router'
         <RouterLink :to="{ name: 'weather-final' }">오늘의 경기</RouterLink>
         <RouterLink :to="{ name: 'final-stadiums' }">구장 가이드</RouterLink>
         <RouterLink :to="{ name: 'final-favorite' }">MY 구단</RouterLink>
+        <RouterLink :to="{ name: 'final-team-doljabi' }">야구팀 돌잡이</RouterLink>
         <RouterLink class="exercise-link" to="/exercise">이전 과제</RouterLink>
       </nav>
     </header>

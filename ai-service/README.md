@@ -11,6 +11,7 @@ KBO 공식 사이트에서 오늘의 경기 일정과 직전 완료 경기 결�
 - 최종 점수, 승리·패전·세이브투수와 결승타 조회
 - 공식 경기 기록만 사용하도록 제한한 경기별 한국어 AI 브리핑 생성
 - Pydantic 기반 구조화 출력으로 `headline`, `game_briefings` 형식 고정
+- 자유롭게 적은 취향과 10개 구단 프로필을 비교하는 `야구팀 돌잡이` 추천
 
 ## 환경 설정
 
@@ -55,7 +56,13 @@ curl 'http://localhost:8000/api/games/today?date=2026-09-20'
 
 ## 브리핑 요청
 
-날짜를 생략하면 한국 시간 기준 어제부터 최대 14일 전까지 확인하여 가장 최근에 완료된 경기일을 사용합니다. 빈 날짜를 확인할 때는 OpenAI를 호출하지 않고, 경기일을 찾은 뒤 한 번만 호출합니다.
+화면을 처음 열 때 사용하는 직전 경기 조회는 KBO 기록만 반환하며 OpenAI를 호출하지 않습니다.
+
+```bash
+curl http://localhost:8000/api/games/latest-results
+```
+
+사용자가 `AI 브리핑 만들기` 버튼을 누르면 아래 브리핑 API를 호출합니다. 날짜를 생략하면 한국 시간 기준 어제부터 최대 14일 전까지 확인하여 가장 최근에 완료된 경기일을 사용합니다. 빈 날짜를 확인할 때는 OpenAI를 호출하지 않고, 경기일을 찾은 뒤 한 번만 호출합니다.
 
 ```bash
 curl -X POST http://localhost:8000/api/briefings/latest
@@ -68,6 +75,18 @@ curl -X POST 'http://localhost:8000/api/briefings/latest?date=2026-09-20'
 ```
 
 브리핑 API를 호출하려면 `.env`에 유효한 `OPENAI_API_KEY`가 있어야 합니다. 경기 데이터 조회에 실패하면 `502`, API 키가 없으면 `503` 응답을 반환합니다.
+
+## 야구팀 돌잡이 요청
+
+좋아하는 지역, 색상, 역사, 응원 분위기 등을 자유롭게 입력하면 제공된 10개 구단 프로필 안에서 1순위와 2순위를 추천합니다.
+
+```bash
+curl -X POST http://localhost:8000/api/team-recommendations \
+  -H 'Content-Type: application/json' \
+  -d '{"preference":"광주에 살고 역사가 깊은 팀과 빨간색을 좋아해"}'
+```
+
+추천 결과는 `recommended_team`, `reasons`, `second_choice_team` 등이 포함된 구조화된 JSON으로 반환됩니다. 특정 식당이나 최근 성적처럼 프로필에 없는 정보는 사용하지 않도록 프롬프트에서 제한합니다.
 
 ## 데이터 사용 시 주의사항
 
